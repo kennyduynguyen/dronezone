@@ -1,0 +1,204 @@
+<script src="//maps.google.com/maps/api/js?key=AIzaSyA2b6Qe48bvmxyYCCr1sA1QqrXCG8dJuYk"></script>
+<script src="//cdn.rawgit.com/mahnunchik/markerclustererplus/master/dist/markerclusterer.min.js"></script>
+<script src='//cdn.rawgit.com/printercu/google-maps-utility-library-v3-read-only/master/infobox/src/infobox_packed.js' type='text/javascript'></script> <!-- only if you need custom infoboxes -->
+
+<!-- -->
+<style type="text/css">
+	.pos{ border-style: none; }
+	.sidebarOne{ 
+		height: 700px;
+		border-color: #1C2331;
+		background-color:#2E2E2E; opacity: 0.9; }
+</style>
+
+<p id="notice"><%= notice %></p>
+
+<div class="body_margin" style="padding:10px; padding-bottom:50px;   /* Set relative to Height of the footer */ ">	
+	<!-- <marquee behavior="scroll" direction="left" scrollamount="5"><h3 id="marqueeOne" >Live Tracking in Progress...</h3></marquee> -->
+	<div class="row">
+		<div class="col-lg-12 col-md-12 col-sm-12 panel" id="divAboveMapOne">
+			<p>Live Tracking</p>
+		</div>
+	</div>
+	<div class="row">
+  		<div id="map" class="pos col-lg-12 col-md-12 col-sm-12" style='height: 700px;'> 
+  			
+  			<script type="text/javascript">
+
+  				// Build Google Maps using Gmaps
+  				var handler = Gmaps.build('Google', { markers: {}});	
+  				var temp_drone_for_search;
+  			
+  				var marker_reg_numbers = [];
+  				var marker_drone_name = [];
+
+				$(document).ready(function(){
+					// Load initial markers (drones) on the map by calling the initial_load() function
+					initial_load();
+					// Call ajax auto_load function every 5 seconds
+	    			setInterval(auto_load, 5000);
+	    		});
+
+				// Load initial markers (drones) on the map 
+				function initial_load(){	
+					// Declare Markers array
+					markers = [];
+					// Ajax to retrieve all drones from mappage controller index action
+  					$.ajax({
+  						type: "GET",
+  						url: "<%= Rails.application.routes.url_helpers.mappage_index_path %>",
+  						cache: false,
+  						contentType: 'application/json',
+  						dataType: "json",
+  						data: <%= raw @hash.to_json %>,
+  						success: function(result){  
+  							var mapStyle ;
+  							handler.buildMap({ provider: {}, internal: {id: 'map'}}, function(){					     		markers = handler.addMarkers(result); 			
+								handler.bounds.extendWith(markers);
+								handler.fitMapToBounds(markers);	
+								var num_of_drones = markers.length;
+  					 			document.getElementById('num_of_drones').innerHTML = num_of_drones;
+								
+								// Make each drone icon listen to a double-click event and a new browser tab and the event 
+								_.each(result, function(json, index){
+	  					 			var marker = markers[index];	
+	  					 			temp_drone_for_search = marker;
+	  					 			marker_reg_numbers[index] = marker.getServiceObject().title;
+									marker_drone_name[index] = result[index]['infowindow'];
+	  					 			
+	  					 			// Add mouseover event listener to drones to display infowindow data 
+	  					 			google.maps.event.addListener(marker.getServiceObject(), 'mouseover', function(){
+							          google.maps.event.trigger(marker.getServiceObject(), 'click');
+							        });
+
+									google.maps.event.addListener(marker.getServiceObject(), 'dblclick', function(evt) {
+										var mydrone = result[index];
+										delete mydrone['marker']; // Delete what's causing mydrone to become a circular structure								
+										//console.log(marker.getServiceObject().title);
+						  				
+						  				// Call sleep function to post double-clicked drone to mappage controller : singledronepage action
+						  				sleep();
+						  				// sleep function
+										function sleep () {
+										  setTimeout(openWindowTab, 300); // Set timeout to 3 milliseconds before calling openWindowTab function
+										}
+										// Open new tab window
+										function openWindowTab(){
+										    window.open("<%= Rails.application.routes.url_helpers.mappage_singledronepage_path %>" + "?infowindow="+mydrone['infowindow']+"&regNumber="+marker.getServiceObject().title);
+										};
+									});
+  					 			});
+  					 			//console.log(marker_reg_numbers.length);
+							});
+		  				},
+		  				error: function(XMLHttpResquestm, textStatus, errorThrown){
+		  					console.log(textStatus, errorThrown);
+		  				}
+		    		});
+	    		};
+
+	    		//Make calls at an interval to reload the map
+  				function auto_load(){	
+  					$.ajax({
+  						type: "GET",
+  						url: "<%= Rails.application.routes.url_helpers.mappage_index_path %>",
+  						cache: false,
+  						contentType: 'application/json',
+  						dataType: "json",
+  						data: <%= raw @hash.to_json %>,
+  						success: function(result){  
+  							for(var i = 0; i < markers.length; i++){
+  								markers[i].setMap(null);
+  								handler.removeMarkers(markers);
+  							}
+  							markers = [];						
+  					 		markers = handler.addMarkers(result);	
+  					 		var num_of_drones = markers.length;
+  					 		document.getElementById('num_of_drones').innerHTML = num_of_drones;
+
+  					 		_.each(result, function(json, index){
+  					 			//--### Newly Updated ### ---
+								var marker = markers[index];	
+								temp_drone_for_search = null;
+								temp_drone_for_search = marker;
+								marker_reg_numbers[index] = marker.getServiceObject().title;
+								marker_drone_name[index] = result[index]['infowindow'];
+
+								//json.marker = marker;
+  					 			google.maps.event.addListener(marker.getServiceObject(), 'mouseover', function(){
+						          google.maps.event.trigger(marker.getServiceObject(), 'click');
+						        });					
+								google.maps.event.addListener(marker.getServiceObject(), 'dblclick', function(evt) {
+									var mydrone = result[index];
+									delete mydrone['marker']; //Delete what's causing mydrone to become a circular structure
+					  				//console.log(marker.getServiceObject().title);
+					  				
+					  				// Call sleep function to post double-clicked drone to mappage controller : singledronepage action
+									sleep();
+									// sleep function
+									function sleep () {
+									  setTimeout(openWindowTab, 300);
+									}
+									// Open new tab window
+									function openWindowTab(){
+									    window.open("<%= Rails.application.routes.url_helpers.mappage_singledronepage_path %>" + "?infowindow="+mydrone['infowindow']+"&regNumber="+marker.getServiceObject().title);
+									};
+								});
+  					 		});
+		  				},
+		  				//Log GET request error
+		  				error: function(XMLHttpResquestm, textStatus, errorThrown){
+		  					console.log(textStatus, errorThrown);
+		  				}
+		    		});	
+				};
+				//Function to search single drone by registration number
+				function track_flight_on_click(){
+					var search_drone_name;
+					//Get search text value
+					var search_drone_reg_number = document.getElementById('reg_number').value;
+					console.log(marker_reg_numbers[2]);
+					for(var i = 0; i < marker_reg_numbers.length; i++){
+						if(marker_reg_numbers[i] == search_drone_reg_number){
+			 				search_drone_name = marker_drone_name[i];
+			 			}
+					}
+					//Open new window tab for searched drone
+					window.open("<%= Rails.application.routes.url_helpers.mappage_singledronepage_path %>"+"?infowindow="+search_drone_name+"&regNumber="+search_drone_reg_number);
+				}
+
+  			</script>
+		</div>
+	</div>
+
+	<div class="row">	
+		<div class="col-lg-12 col-md-12 col-sm-12 bottomDiv">
+			<div class="trackYourDrone col-lg-4 col-md-4 col-sm-12 panel">
+				<div class="row">
+					<div class="enterDroneNum">
+						<h4> Quick & Easy Tracking</h4>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-lg-3 col-md-3 col-12">
+						<form action="#" onsubmit="return track_flight_on_click();">
+							<div id="enterDroneNumBox" class="enterDroneNum">
+  								<input type="text" name="droneNumber" id="reg_number" placeholder="Enter Drone Reg. #"><br><br>
+  							</div>
+  							<div id="trackFlightButton">
+ 								<input type="submit" value="Track Flight" class="btn btn-danger">
+ 							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+			<div class="col-lg-7 col-lg-offset-1 col-md-7 col-md-offset-1 col-sm-12 marquee">
+				<h5 style="font-size: 18px;">Live tracking in progress...Double click drone icon to view telemetry data or use the Quick & Easy Tracking search field.</h5>
+			</div>
+			<div class="col-lg-7 col-lg-offset-1 col-md-7 col-md-offset-1 col-sm-12" id="num_of_drones_div">
+				<h4 style="color: rgba(255,255,255,1);"><span id="num_of_drones"></span> DRONES ON THE MAP</h4>
+			</div>
+			
+		</div>
+	</div>
+</div>
